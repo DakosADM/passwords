@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Анализ надёжности паролей и методов их хранения</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f2f2f7;--surface:#fff;--ink:#000;--muted:#6c6c70;--line:#d1d1d6;--fill:#e9e9ee;
+  --accent:#007aff;--bad:#ff3b30;--warn:#ff9500;--good:#34c759;
+  --glass:rgba(255,255,255,.42);--glass-edge:rgba(255,255,255,.7);--glass-hi:rgba(255,255,255,.8);--glass-sel:rgba(255,255,255,.85);--glass-in:rgba(255,255,255,.45);--glass-shadow:rgba(40,60,120,.18);
+  --b1:rgba(0,122,255,.38);--b2:rgba(255,45,146,.28);--b3:rgba(52,199,89,.3);
+  --f-head:'Unbounded','Arial Black',sans-serif;--f-body:'Onest',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#000;--surface:#1c1c1e;--ink:#fff;--muted:#8e8e93;--line:#38383a;--fill:#2c2c2e;
+  --accent:#0a84ff;--bad:#ff453a;--warn:#ff9f0a;--good:#30d158;
+  --glass:rgba(60,60,72,.38);--glass-edge:rgba(255,255,255,.16);--glass-hi:rgba(255,255,255,.22);--glass-sel:rgba(255,255,255,.22);--glass-in:rgba(255,255,255,.08);--glass-shadow:rgba(0,0,0,.5);
+  --b1:rgba(10,132,255,.5);--b2:rgba(191,90,242,.42);--b3:rgba(48,209,88,.3);color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#000;--surface:#1c1c1e;--ink:#fff;--muted:#8e8e93;--line:#38383a;--fill:#2c2c2e;--accent:#0a84ff;--bad:#ff453a;--warn:#ff9f0a;--good:#30d158;--glass:rgba(60,60,72,.38);--glass-edge:rgba(255,255,255,.16);--glass-hi:rgba(255,255,255,.22);--glass-sel:rgba(255,255,255,.22);--glass-in:rgba(255,255,255,.08);--glass-shadow:rgba(0,0,0,.5);--b1:rgba(10,132,255,.5);--b2:rgba(191,90,242,.42);--b3:rgba(48,209,88,.3);color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px);scroll-behavior:smooth}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 var(--f-body);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+.wrap{max-width:860px;margin:0 auto;padding:0 20px}
+header.hero{padding:56px 0 40px}
+h1{font:700 clamp(26px,6vw,44px)/1.15 var(--f-head);margin:0 0 16px;letter-spacing:-.01em}
+.lead{color:var(--muted);max-width:60ch;margin:0 0 28px}
+h2{font:700 clamp(21px,4.5vw,28px)/1.2 var(--f-head);margin:0 0 14px}
+h3{font:600 18px/1.3 var(--f-body);margin:0 0 6px}
+section{padding:28px 0}
+p{margin:0 0 14px;max-width:68ch}
+.tester{background:var(--surface);border-radius:20px;padding:20px}
+.field{display:flex;gap:8px}
+.field input{flex:1;min-width:0;font:500 19px var(--f-body);padding:12px 14px;border:none;border-radius:12px;background:var(--fill);color:var(--ink)}
+.field input:focus-visible,.field button:focus-visible,.tabs button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.field button{padding:0 16px;border:none;border-radius:12px;background:var(--fill);color:var(--accent);font:600 15px var(--f-body);cursor:pointer}
+.meter{height:6px;border-radius:3px;background:var(--fill);margin:16px 0 10px;overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:var(--bad);transition:width .25s,background .25s}
+.verdict{font-weight:600;margin:0 0 4px}
+.note{color:var(--muted);font-size:15px;margin:0}
+.scen{display:grid;gap:10px;margin-top:18px}
+.scen div{display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:10px 0;border-top:1px solid var(--line)}
+.scen span{color:var(--muted);font-size:15px}
+.scen b{font:600 18px var(--f-body);text-align:right}
+.hint{font-size:14px;color:var(--muted);margin-top:12px}
+.attacks{display:grid;gap:18px}
+.attacks div{background:var(--surface);border-radius:16px;padding:16px 18px}
+.attacks p{margin:0}
+.tabs{display:flex;gap:2px;margin-bottom:16px;padding:2px;background:var(--fill);border-radius:10px;overflow-x:auto;scrollbar-width:none}
+.tabs button{flex:1 0 auto;padding:7px 14px;border-radius:8px;border:none;background:transparent;color:var(--ink);font:500 14px var(--f-body);cursor:pointer;white-space:nowrap}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.panel{background:var(--surface);border-radius:20px;padding:20px}
+.tag{display:inline-block;font-weight:600;font-size:14px;padding:2px 10px;border-radius:999px;color:#fff;margin-bottom:10px}
+.t-bad{background:var(--bad)}.t-warn{background:var(--warn)}.t-good{background:var(--good)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag{color:#000}}
+:root[data-theme="dark"] .tag{color:#000}
+.panel pre{margin:0 0 12px;padding:12px;background:var(--bg);border-radius:8px;overflow-x:auto;font:14px/1.5 ui-monospace,Menlo,Consolas,monospace}
+.bars{margin-top:8px}
+.bar{display:grid;grid-template-columns:110px 1fr 90px;gap:10px;align-items:center;margin:10px 0;font-size:15px}
+.bar .track{height:14px;background:var(--line);border-radius:7px;overflow:hidden}
+.bar .track i{display:block;height:100%;background:var(--accent);border-radius:7px}
+.bar .v{text-align:right;color:var(--muted);font-size:14px}
+.scroll{overflow-x:auto;background:var(--surface);border-radius:16px}
+tbody tr:last-child td{border-bottom:none}
+table{border-collapse:collapse;width:100%;min-width:520px;font-size:15px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-weight:600}
+ul.check{padding-left:20px;margin:0 0 14px;max-width:68ch}
+ul.check li{margin-bottom:8px}
+.two{display:grid;gap:24px}
+@media(min-width:720px){.two{grid-template-columns:1fr 1fr}.attacks{grid-template-columns:1fr 1fr}}
+footer{padding:20px 0 40px;color:var(--muted);font-size:13px;text-align:center}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(60% 40% at 12% 8%,var(--b1),transparent 70%),radial-gradient(50% 40% at 92% 38%,var(--b2),transparent 70%),radial-gradient(60% 45% at 25% 96%,var(--b3),transparent 70%)}
+.tester,.attacks div,.panel,.scroll,.tabs{background:var(--glass);-webkit-backdrop-filter:blur(26px) saturate(180%);backdrop-filter:blur(26px) saturate(180%);border:1px solid var(--glass-edge);box-shadow:0 10px 36px var(--glass-shadow),inset 0 1.5px 0 var(--glass-hi),inset 0 -1px 0 rgba(255,255,255,.1)}
+.tester,.panel{border-radius:30px}
+.attacks div{border-radius:24px}
+.scroll{border-radius:24px}
+.tabs{border-radius:999px;padding:4px;gap:4px}
+.tabs button{border-radius:999px}
+.tabs button[aria-selected="true"]{background:var(--glass-sel);box-shadow:0 2px 10px var(--glass-shadow),inset 0 1px 0 var(--glass-hi)}
+.field input{background:var(--glass-in);border:1px solid var(--glass-edge);border-radius:16px;box-shadow:inset 0 2px 4px rgba(0,0,0,.08)}
+.field button{background:var(--glass-in);border:1px solid var(--glass-edge);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-hi)}
+.meter{background:rgba(120,120,128,.25)}
+.panel pre{background:var(--glass-in)}
+.bar .track{background:rgba(120,120,128,.25)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>Сколько проживёт ваш пароль</h1>
+  <p class="lead">Надёжность пароля зависит от двух вещей: насколько трудно его угадать и как сервис хранит его у себя. Проверьте пароль ниже, а затем разберите, как устроено хранение.</p>
+  <div class="tester">
+    <label for="pw" class="note" style="display:block;margin-bottom:8px">Введите пароль для проверки</label>
+    <div class="field">
+      <input id="pw" type="password" autocomplete="off" spellcheck="false" placeholder="Например: Qwerty2024!">
+      <button id="eye" type="button" aria-pressed="false">Показать</button>
+    </div>
+    <div class="meter" role="progressbar" aria-label="Надёжность" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="fill"></i></div>
+    <p class="verdict" id="verdict">Введите пароль</p>
+    <p class="note" id="info">Расчёт идёт в вашем браузере, пароль никуда не отправляется.</p>
+    <div class="scen">
+      <div><span>Подбор через форму входа (100 попыток/с)</span><b id="s1">–</b></div>
+      <div><span>Утечка базы, быстрый хеш MD5 (10 млрд/с на GPU)</span><b id="s2">–</b></div>
+      <div><span>Утечка базы, bcrypt (10 тыс./с на GPU)</span><b id="s3">–</b></div>
+    </div>
+    <p class="hint">Оценка приблизительная: она считает энтропию по набору символов и штрафует очевидные шаблоны, но не заменяет словарный анализ.</p>
+  </div>
+</header>
+
+<section>
+  <h2>Как пароли взламывают</h2>
+  <div class="attacks">
+    <div><h3>Перебор (brute force)</h3><p>Атакующий пробует все комбинации. Каждый лишний символ умножает работу в десятки раз.</p></div>
+    <div><h3>Словарь и правила</h3><p>Берутся реальные пароли из прошлых утечек плюс мутации: замена «a» на «@», цифры в конце, заглавная первая буква.</p></div>
+    <div><h3>Credential stuffing</h3><p>Пару «логин и пароль» из одной утечки пробуют на других сайтах. Повторное использование пароля обнуляет его стойкость.</p></div>
+    <div><h3>Радужные таблицы</h3><p>Заранее посчитанные хеши популярных паролей. Работают против хешей без соли и бесполезны, если соль уникальна.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>Как хранят пароли</h2>
+  <p>Если взломана база, всё решает способ хранения. Выберите вариант:</p>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="panel" id="panel" role="tabpanel" aria-live="polite"></div>
+</section>
+
+<section>
+  <h2>Скорость подбора по алгоритмам</h2>
+  <p>Для хранения паролей скорость хеширования недостаток: чем быстрее алгоритм, тем быстрее перебор. Порядок величин для одной современной видеокарты (шкала логарифмическая).</p>
+  <div class="bars" id="bars"></div>
+</section>
+
+<section>
+  <h2>Сравнение методов</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Метод</th><th>Соль</th><th>Устойчивость к GPU</th><th>Вывод</th></tr></thead>
+    <tbody>
+      <tr><td>Открытый текст</td><td>нет</td><td>не нужна</td><td>Недопустимо</td></tr>
+      <tr><td>MD5 / SHA-1</td><td>нет</td><td>очень низкая</td><td>Недопустимо</td></tr>
+      <tr><td>SHA-256 с солью</td><td>есть</td><td>низкая</td><td>Устарело</td></tr>
+      <tr><td>PBKDF2</td><td>есть</td><td>средняя</td><td>Допустимо при большом числе итераций</td></tr>
+      <tr><td>bcrypt</td><td>есть</td><td>высокая</td><td>Хороший выбор</td></tr>
+      <tr><td>scrypt</td><td>есть</td><td>высокая (память)</td><td>Хороший выбор</td></tr>
+      <tr><td>Argon2id</td><td>есть</td><td>очень высокая (память)</td><td>Рекомендуемый стандарт</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section>
+  <h2>Что делать</h2>
+  <div class="two">
+    <div>
+      <h3>Пользователю</h3>
+      <ul class="check">
+        <li>Используйте длинную парольную фразу: 4–5 случайных слов надёжнее короткого пароля со спецсимволами.</li>
+        <li>Свой пароль для каждого сервиса, менеджер паролей помогает их не запоминать.</li>
+        <li>Включите двухфакторную аутентификацию, лучше приложение или ключ, чем SMS.</li>
+        <li>Проверьте адрес почты в базах утечек, например на haveibeenpwned.com.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Разработчику</h3>
+      <ul class="check">
+        <li>Хешируйте Argon2id (по OWASP от 19 МиБ памяти, 2 итерации) или bcrypt со стоимостью не ниже 10.</li>
+        <li>Уникальная случайная соль на каждого пользователя, библиотека делает это сама.</li>
+        <li>Ограничивайте число попыток входа и добавляйте задержки.</li>
+        <li>Не запрещайте длинные пароли и вставку из менеджера; сверяйте пароль со списками утёкших.</li>
+        <li>Не придумывайте собственную криптографию.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<footer>Материал носит учебный характер. Цифры скорости приблизительные и зависят от оборудования и настроек алгоритмов.</footer>
+</div>
+
+<script>
+(function(){
+  var COMMON=['password','123456','12345678','qwerty','111111','abc123','letmein','admin','iloveyou','welcome','monkey','dragon','пароль','йцукен','123123','qwerty123','password1','1q2w3e4r'];
+  var SEQ=['0123456789','abcdefghijklmnopqrstuvwxyz','qwertyuiop','asdfghjkl','zxcvbnm','йцукенгшщзхъ','фывапролджэ','ячсмитьбю'];
+  var pw=document.getElementById('pw'),fill=document.getElementById('fill'),verdict=document.getElementById('verdict'),info=document.getElementById('info');
+  var s1=document.getElementById('s1'),s2=document.getElementById('s2'),s3=document.getElementById('s3'),meter=fill.parentNode;
+
+  function entropy(p){
+    var low=p.toLowerCase();
+    if(COMMON.indexOf(low)>-1) return {bits:8,notes:['Пароль входит в список самых популярных']};
+    var pool=0,notes=[];
+    if(/[a-z]/.test(p))pool+=26; if(/[A-Z]/.test(p))pool+=26;
+    if(/[а-яё]/.test(p))pool+=33; if(/[А-ЯЁ]/.test(p))pool+=33;
+    if(/[0-9]/.test(p))pool+=10; if(/[^A-Za-zА-Яа-яЁё0-9]/.test(p))pool+=33;
+    var uniq={};for(var i=0;i<p.length;i++)uniq[p[i]]=1;
+    var u=Object.keys(uniq).length,eff=u+(p.length-u)*0.3;
+    var bits=eff*Math.log2(pool||1);
+    if(u<p.length*0.6)notes.push('Много повторяющихся символов');
+    var seq=false;
+    for(var k=0;k<SEQ.length&&!seq;k++){for(var j=0;j+3<=low.length;j++){var t=low.substr(j,3);if(SEQ[k].indexOf(t)>-1||SEQ[k].split('').reverse().join('').indexOf(t)>-1){seq=true;break}}}
+    if(seq){bits-=10;notes.push('Есть последовательности вроде abc, 123 или qwe')}
+    if(/(19|20)\d\d/.test(p)){bits-=6;notes.push('Содержит год, его легко угадать')}
+    for(var c=0;c<COMMON.length;c++){if(low.length>COMMON[c].length&&low.indexOf(COMMON[c])>-1){bits-=12;notes.push('Содержит популярное слово');break}}
+    if(p.length<10)notes.push('Короче 10 символов');
+    return {bits:Math.max(bits,1),notes:notes};
+  }
+  function fmt(sec){
+    if(sec<1)return 'мгновенно';
+    if(sec<60)return Math.round(sec)+' с';
+    if(sec<3600)return Math.round(sec/60)+' мин';
+    if(sec<86400)return Math.round(sec/3600)+' ч';
+    if(sec<2592000)return Math.round(sec/86400)+' сут';
+    var y=sec/31557600;
+    if(y<1)return Math.round(sec/2592000)+' мес';
+    if(y<1000)return Math.round(y)+' лет';
+    if(y<1e6)return Math.round(y/1e3)+' тыс. лет';
+    if(y<1e9)return Math.round(y/1e6)+' млн лет';
+    if(y<1e12)return Math.round(y/1e9)+' млрд лет';
+    return 'более трлн лет';
+  }
+  function update(){
+    var p=pw.value;
+    if(!p){fill.style.width='0';meter.setAttribute('aria-valuenow','0');verdict.textContent='Введите пароль';verdict.style.color='';info.textContent='Расчёт идёт в вашем браузере, пароль никуда не отправляется.';s1.textContent=s2.textContent=s3.textContent='–';return}
+    var r=entropy(p),guesses=Math.pow(2,r.bits)/2;
+    s1.textContent=fmt(guesses/100);s2.textContent=fmt(guesses/1e10);s3.textContent=fmt(guesses/1e4);
+    var offline=guesses/1e10,pct=Math.min(100,Math.round(r.bits/80*100)),label,color;
+    if(offline<3600){label='Очень слабый';color='var(--bad)'}
+    else if(offline<2592000*12){label='Слабый';color='var(--bad)'}
+    else if(offline<31557600*100){label='Средний';color='var(--warn)'}
+    else{label='Надёжный';color='var(--good)'}
+    fill.style.width=pct+'%';fill.style.background=color;meter.setAttribute('aria-valuenow',pct);
+    verdict.textContent=label+' · около '+Math.round(r.bits)+' бит энтропии';verdict.style.color=color;
+    info.textContent=r.notes.length?r.notes.join('. ')+'.':'Явных шаблонов не найдено.';
+  }
+  pw.addEventListener('input',update);
+  document.getElementById('eye').addEventListener('click',function(){
+    var show=pw.type==='password';pw.type=show?'text':'password';this.textContent=show?'Скрыть':'Показать';this.setAttribute('aria-pressed',show);
+  });
+
+  var METHODS=[
+   {n:'Открытый текст',t:'bad',tag:'Критично',code:'password = "qwerty123"',d:'Пароль лежит в базе как есть. Любая утечка, а также любой администратор или разработчик с доступом к базе видит все пароли. Из-за повторного использования это бьёт и по другим сервисам.'},
+   {n:'MD5 / SHA-1',t:'bad',tag:'Критично',code:'md5("qwerty123")\n= 3fc0a7acf087f549ac2b266baf94b8b1',d:'Хеш односторонний, но одинаковые пароли дают одинаковый хеш, а алгоритм считается за наносекунды. Популярные пароли находятся по таблицам за секунды, остальные перебираются на GPU миллиардами в секунду.'},
+   {n:'SHA-256 + соль',t:'warn',tag:'Устарело',code:'sha256(salt + password)',d:'Соль ломает радужные таблицы и скрывает одинаковые пароли. Но SHA-256 всё ещё слишком быстр: видеокарта перебирает десятки миллиардов вариантов в секунду.'},
+   {n:'PBKDF2',t:'warn',tag:'Допустимо',code:'PBKDF2-HMAC-SHA256(\n  password, salt, 600000 итераций)',d:'Многократное повторение хеша замедляет перебор. Стандартизирован и поддерживается везде, но почти не требует памяти, поэтому GPU и ASIC ускоряют атаку сильнее, чем у scrypt и Argon2.'},
+   {n:'bcrypt',t:'good',tag:'Хорошо',code:'$2b$12$Zk3...соль...хеш',d:'Намеренно медленный, соль и параметр стоимости хранятся в самой строке. Ограничение: учитывает только первые 72 байта пароля.'},
+   {n:'scrypt',t:'good',tag:'Хорошо',code:'scrypt(password, salt, N, r, p)',d:'Требует много оперативной памяти, из-за чего массовый параллельный перебор на видеокартах дорожает.'},
+   {n:'Argon2id',t:'good',tag:'Рекомендуется',code:'$argon2id$v=19$m=19456,t=2,p=1$...',d:'Победитель конкурса Password Hashing Competition. Настраивается по памяти, времени и параллелизму, сочетает защиту от GPU и от атак по побочным каналам.'}
+  ];
+  var tabs=document.getElementById('tabs'),panel=document.getElementById('panel');
+  function show(i){
+    var m=METHODS[i];
+    Array.prototype.forEach.call(tabs.children,function(b,j){b.setAttribute('aria-selected',j===i)});
+    panel.innerHTML='<span class="tag t-'+m.t+'">'+m.tag+'</span><pre></pre><p style="margin:0"></p>';
+    panel.querySelector('pre').textContent=m.code;panel.querySelector('p').textContent=m.d;
+  }
+  METHODS.forEach(function(m,i){var b=document.createElement('button');b.type='button';b.setAttribute('role','tab');b.textContent=m.n;b.addEventListener('click',function(){show(i)});tabs.appendChild(b)});
+  show(0);
+
+  var SPEED=[['MD5',1.6e11,'~160 млрд/с'],['SHA-256',2.2e10,'~22 млрд/с'],['PBKDF2',1e7,'~10 млн/с'],['bcrypt',2e5,'~200 тыс./с'],['Argon2id',1e4,'~10 тыс./с']];
+  var bars=document.getElementById('bars'),max=Math.log10(2e11),min=Math.log10(1e3);
+  SPEED.forEach(function(s){
+    var w=Math.max(4,(Math.log10(s[1])-min)/(max-min)*100);
+    var d=document.createElement('div');d.className='bar';
+    d.innerHTML='<span></span><div class="track"><i style="width:'+w+'%"></i></div><span class="v"></span>';
+    d.children[0].textContent=s[0];d.children[2].textContent=s[2];bars.appendChild(d);
+  });
+})();
+</script>
+</body>
+</html>
